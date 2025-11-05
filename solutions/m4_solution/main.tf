@@ -84,55 +84,6 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-resource "aws_security_group" "web" {
-  description = "Security group for web servers"
-  vpc_id      = aws_vpc.main.id
-
-  dynamic "ingress" {
-    for_each = local.ingress_rules
-    content {
-      protocol    = ingress.value.protocol
-      from_port   = ingress.value.from_port
-      to_port     = ingress.value.to_port
-      cidr_blocks = ingress.value.cidr_blocks
-    }
-  }
-
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
-  }
-
-  tags = merge(local.common_tags, {
-    Name = format("%s-web-sg", local.name_prefix)
-  })
-}
-
-data "aws_ssm_parameter" "amazon_linux_2_ami" {
-  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
-}
-
-resource "aws_instance" "web" {
-  ami                    = data.aws_ssm_parameter.amazon_linux_2_ami.value
-  instance_type          = var.environment == "production" ? "t3.small" : "t3.micro"
-  subnet_id              = aws_subnet.public[0].id
-  vpc_security_group_ids = [aws_security_group.web.id]
-  monitoring             = var.environment == "production" ? true : false
-  user_data = templatefile("${path.module}/templates/user_data.tftpl", {
-    company     = var.company
-    environment = var.environment
-    team        = var.team
-  })
-
-  tags = merge(local.common_tags, {
-    Name   = format("%s-web-instance", local.name_prefix)
-    Backup = var.environment == "production" ? "Daily" : "Weekly"
-  })
-
-}
-
 
 resource "aws_s3_bucket" "web" {
   for_each = toset(local.bucket_prefixes)
@@ -145,7 +96,7 @@ resource "aws_s3_bucket" "web" {
 
 resource "aws_s3_bucket_public_access_block" "web" {
   for_each = toset(local.bucket_prefixes)
-  bucket = aws_s3_bucket.web[each.key].id
+  bucket   = aws_s3_bucket.web[each.key].id
 
   block_public_acls       = true
   block_public_policy     = true

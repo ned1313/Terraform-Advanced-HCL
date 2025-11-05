@@ -136,7 +136,7 @@ resource "aws_instance" "web" {
 
   tags = merge(local.common_tags, {
     Name   = format("%s-web-instance", local.name_prefix)
-    Backup = var.environment == "production" ? "Daily" : "None"
+    Backup = var.environment == "production" ? "Daily" : "Weekly"
   })
 
 }

@@ -84,55 +84,51 @@ resource "aws_route_table_association" "public" {
   route_table_id = aws_route_table.public.id
 }
 
-resource "aws_security_group" "web" {
-  description = "Security group for web servers"
-  vpc_id      = aws_vpc.main.id
-
-  dynamic "ingress" {
-    for_each = local.ingress_rules
-    content {
-      protocol    = ingress.value.protocol
-      from_port   = ingress.value.from_port
-      to_port     = ingress.value.to_port
-      cidr_blocks = ingress.value.cidr_blocks
-    }
+## Nework ACL processing
+locals {
+  csv_data = csvdecode(file("${path.module}/m5_rules.csv"))
+  acl_ingress_rules = {
+    for rule in local.csv_data : rule.priority => rule if rule.direction == "ingress"
   }
-
-  egress {
-    protocol    = "-1"
-    from_port   = 0
-    to_port     = 0
-    cidr_blocks = ["0.0.0.0/0"]
+  acl_egress_rules = {
+    for rule in local.csv_data : rule.priority => rule if rule.direction == "egress"
   }
+}
+
+# Network ACL
+resource "aws_network_acl" "main" {
+  vpc_id     = aws_vpc.main.id
+  subnet_ids = [for subnet in aws_subnet.public : subnet.id]
 
   tags = merge(local.common_tags, {
-    Name = format("%s-web-sg", local.name_prefix)
+    Name = format("%s-nacl", local.name_prefix)
   })
 }
 
-data "aws_ssm_parameter" "amazon_linux_2_ami" {
-  name = "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+# Inbound rules
+resource "aws_network_acl_rule" "ingress" {
+  for_each       = local.acl_ingress_rules
+  network_acl_id = aws_network_acl.main.id
+  rule_number    = (each.value.priority * 10) + 100
+  egress         = false
+  protocol       = each.value.protocol
+  rule_action    = each.value.rule_action
+  cidr_block     = each.value.cidr_block
+  from_port      = each.value.from_port
+  to_port        = each.value.to_port
 }
 
-resource "aws_instance" "web" {
-  ami                    = data.aws_ssm_parameter.amazon_linux_2_ami.value
-  instance_type          = var.environment == "production" ? "t3.small" : "t3.micro"
-  subnet_id              = aws_subnet.public[0].id
-  vpc_security_group_ids = [aws_security_group.web.id]
-  monitoring             = var.environment == "production" ? true : false
-  user_data = templatefile("${path.module}/templates/user_data.tftpl", {
-    company     = var.company
-    environment = var.environment
-    team        = var.team
-  })
-
-  tags = merge(local.common_tags, {
-    Name   = format("%s-web-instance", local.name_prefix)
-    Backup = var.environment == "production" ? "Daily" : "Weekly"
-  })
-
+resource "aws_network_acl_rule" "egress" {
+  for_each       = local.acl_egress_rules
+  network_acl_id = aws_network_acl.main.id
+  rule_number    = (each.value.priority * 10) + 100
+  egress         = true
+  protocol       = each.value.protocol
+  rule_action    = each.value.rule_action
+  cidr_block     = each.value.cidr_block
+  from_port      = each.value.from_port
+  to_port        = each.value.to_port
 }
-
 
 resource "aws_s3_bucket" "web" {
   for_each = toset(local.bucket_prefixes)
@@ -145,10 +141,29 @@ resource "aws_s3_bucket" "web" {
 
 resource "aws_s3_bucket_public_access_block" "web" {
   for_each = toset(local.bucket_prefixes)
-  bucket = aws_s3_bucket.web[each.key].id
+  bucket   = aws_s3_bucket.web[each.key].id
 
   block_public_acls       = true
   block_public_policy     = true
   ignore_public_acls      = true
   restrict_public_buckets = true
+}
+
+ephemeral "random_password" "app_password" {
+  length  = 16
+  special = true
+}
+
+resource "aws_secretsmanager_secret" "app_password" {
+  name_prefix = format("%s-app-password-", local.name_prefix)
+
+  tags = local.common_tags
+
+}
+
+resource "aws_secretsmanager_secret_version" "app_password_version" {
+  secret_id                = aws_secretsmanager_secret.app_password.id
+  secret_string_wo         = ephemeral.random_password.app_password.result
+  secret_string_wo_version = var.app_password_version
+
 }

@@ -1,0 +1,7 @@
+priority,direction,protocol,rule_action,cidr_block,from_port,to_port
+1,ingress,tcp,allow,0.0.0.0/0,80,80
+2,ingress,tcp,allow,0.0.0.0/0,443,443
+3,ingress,tcp,allow,0.0.0.0/0,1024,65535
+1,egress,tcp,allow,0.0.0.0/0,80,80
+2,egress,tcp,allow,0.0.0.0/0,443,443
+3,egress,tcp,allow,0.0.0.0/0,1024,65535
