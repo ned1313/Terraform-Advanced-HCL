@@ -2,7 +2,7 @@
 
 Exercise files to accompany my Pluralsight course of the same name. You can always find the latest version at [https://github.com/ned1313/terraform-advanced-hcl](https://github.com/ned1313/terraform-advanced-hcl)
 
-Welcome to **Terraform - Advanced HCL**.  These exercise files are meant to accompany my course on [Pluralsight](http://www.pluralsight.com/courses/terraform-modules).  The course was developed using version 1.12.2 of Terraform. This is the sixth course in the Terraform Learning Path on Pluralsight. I am assuming you have taken the **Getting Started - Terraform** course or you have equivalent knowledge.
+Welcome to **Terraform - Advanced HCL**.  These exercise files are meant to accompany my course on [Pluralsight](http://www.pluralsight.com/courses/terraform-advanced-hcl).  The course was developed using version 1.12.2 of Terraform. This is the sixth course in the Terraform Learning Path on Pluralsight. I am assuming you have taken the **Getting Started - Terraform** course or you have equivalent knowledge.
 
 ## Using the files
 
